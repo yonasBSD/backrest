@@ -60,16 +60,43 @@ export const formatDate = (time: number | string | Date) => {
   return isoStr.substring(0, 10);
 };
 
-export const formatDuration = (ms: number) => {
-  const seconds = Math.ceil(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours === 0 && minutes === 0) {
-    return `${seconds % 60}s`;
-  } else if (hours === 0) {
-    return `${minutes}m${seconds % 60}s`;
+const durationSteps = [1000, 60, 60, 24, Number.MAX_VALUE];
+const durationFactors = [1, 1000, 60 * 1000, 60 * 60 * 1000, 24 * 60 * 60 * 1000];
+const shortDurationUnits = ["ms", "s", "m", "h", "d"];
+type DurationUnit = typeof shortDurationUnits[number];
+
+export interface FormatDurationOptions {
+  minUnit?: DurationUnit;
+  maxUnit?: DurationUnit;
+}
+
+export const formatDuration = (ms: number, options?: FormatDurationOptions) => {
+  if (!ms && ms !== 0) return "";
+
+  if (!options && ms < 60 * 1000) {
+    // If no options and less than a minute, show seconds
+    // Performance optimization
+    return `${Math.round(ms / 1000)}s`;
   }
-  return `${hours}h${minutes % 60}m${Math.floor(seconds % 60)}s`;
+
+  const minUnitIndex = options?.minUnit ? shortDurationUnits.indexOf(options.minUnit) : 1; // Don't show ms by default
+  const maxUnitIndex = options?.maxUnit ? shortDurationUnits.indexOf(options.maxUnit) : shortDurationUnits.length - 1;
+
+  const absMs = Math.abs(ms);
+  let result = "";
+
+  for (let i = maxUnitIndex; i >= minUnitIndex; i--) {
+    const value = Math.floor(absMs / durationFactors[i]) % durationSteps[i];
+    if (value > 0) {
+      result += `${value}${shortDurationUnits[i]}`;
+    }
+  }
+
+  if (!result) {
+    result = `0${shortDurationUnits[minUnitIndex]}`;
+  }
+
+  return ms < 0 ? `-${result}` : result;
 };
 
 export const normalizeSnapshotId = (id: string) => {
